@@ -5,6 +5,7 @@ import random
 
 import click
 import cv2
+import skimage.measure
 import torch
 import numpy as np
 from PIL import Image
@@ -505,6 +506,15 @@ def test(input_dir, output_dir, tile_size, model_dir):
 
             post_images, scoring = postprocess(img, images['Seg'])
             images = {**images, **post_images}
+
+            # Save the segmentation mask
+            segmentation = images['SegRefined']
+            segmentation = np.concatenate((segmentation[:, :, 0], 2 * segmentation[:, :, 2]))
+            segmentation = skimage.measure.label(segmentation)
+            np.save(os.path.join(
+                output_dir,
+                filename.replace('.' + filename.split('.')[-1], f'_inst_seg.npy')
+            ), segmentation)
 
             for name, i in images.items():
                 i.save(os.path.join(
