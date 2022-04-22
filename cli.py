@@ -510,8 +510,8 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
 
             # Save the segmentation mask
             segmentation = np.array(images['SegRefined'])
-            print(np.unique(segmentation[:, :, 0]), np.unique(segmentation[:, :, 2]))
-            segmentation = segmentation[:, :, 0] + 2 * segmentation[:, :, 2]
+            segmentation[:, :, 1] = 0
+            # segmentation = segmentation[:, :, 0] + 2 * segmentation[:, :, 2]
             if mask_dir is not None:
                 mask = Image.open(os.path.join(mask_dir, filename.replace('.' + filename.split('.')[-1], '.png')))
                 mask = np.array(mask.convert('1'))
