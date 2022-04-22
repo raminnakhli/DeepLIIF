@@ -270,6 +270,7 @@ def postprocess(img, seg_img, thresh=80, noise_objects_size=20, small_object_siz
     mask_image = create_basic_segmentation_mask(np.array(img), np.array(seg_img),
                                                 thresh, noise_objects_size, small_object_size)
     images = {}
+    images['BasicMask'] = Image.fromarray(mask_image)
     images['SegOverlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
     images['SegRefined'] = Image.fromarray(create_final_segmentation_mask_with_boundaries(np.array(mask_image)))
 
