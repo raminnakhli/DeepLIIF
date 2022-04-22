@@ -528,7 +528,7 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
             np.save(os.path.join(
                 output_dir,
                 filename.replace('.' + filename.split('.')[-1], '_type_seg.npy')
-            ), np.concatenate((segmentation[:, :, 0], segmentation[:, :, 2]), axis=2))
+            ), np.stack((segmentation[:, :, 0], segmentation[:, :, 2]), axis=-1))
 
             for name, i in images.items():
                 i.save(os.path.join(
