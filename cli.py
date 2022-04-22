@@ -509,7 +509,7 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
             images = {**images, **post_images}
 
             # Save the segmentation mask
-            segmentation = images['SegRefined']
+            segmentation = np.array(images['SegRefined'])
             segmentation = np.concatenate((segmentation[:, :, 0], 2 * segmentation[:, :, 2]))
             if mask_dir is not None:
                 mask = np.load(os.path.join(mask_dir, filename.split('.')[-1]+'.npy'))
