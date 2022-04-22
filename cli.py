@@ -515,7 +515,7 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
             if mask_dir is not None:
                 mask = Image.open(os.path.join(mask_dir, filename.replace('.' + filename.split('.')[-1], '.png')))
                 mask = np.array(mask.convert('1'))
-                segmentation = segmentation * mask
+                segmentation = segmentation * mask[:, :, np.newaxis]
             segmentation = skimage.measure.label(segmentation)
             np.save(os.path.join(
                 output_dir,
