@@ -481,7 +481,8 @@ def serialize(models_dir, output_dir):
 @click.option('--output-dir', help='saves results here.')
 @click.option('--tile-size', default=512, help='tile size')
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
-def test(input_dir, output_dir, tile_size, model_dir):
+@click.option('--mask-dir', default=None, help='path to the masks')
+def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
     """Test trained models
     """
     output_dir = output_dir or input_dir
@@ -510,6 +511,9 @@ def test(input_dir, output_dir, tile_size, model_dir):
             # Save the segmentation mask
             segmentation = images['SegRefined']
             segmentation = np.concatenate((segmentation[:, :, 0], 2 * segmentation[:, :, 2]))
+            if mask_dir is not None:
+                mask = np.load(os.path.join(mask_dir, filename.split('.')[-1]+'.npy'))
+                segmentation = segmentation * mask
             segmentation = skimage.measure.label(segmentation)
             np.save(os.path.join(
                 output_dir,
