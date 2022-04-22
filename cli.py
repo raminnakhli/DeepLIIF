@@ -509,7 +509,7 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
             images = {**images, **post_images}
 
             # Save the segmentation mask
-            segmentation = np.array(images['SegRefined'])
+            segmentation = np.array(images['BasicMask'])
             np.save(os.path.join(
                 output_dir,
                 filename.replace('.' + filename.split('.')[-1], '_seg.npy')
