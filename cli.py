@@ -512,12 +512,12 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
             segmentation = np.array(images['SegRefined'])
             segmentation = np.concatenate((segmentation[:, :, 0], 2 * segmentation[:, :, 2]))
             if mask_dir is not None:
-                mask = np.load(os.path.join(mask_dir, filename.split('.')[-2]+'.npy'))
+                mask = np.load(os.path.join(mask_dir, filename.replace('.' + filename.split('.')[-1], '.npy')))
                 segmentation = segmentation * mask
             segmentation = skimage.measure.label(segmentation)
             np.save(os.path.join(
                 output_dir,
-                filename.replace('.' + filename.split('.')[-2], f'_inst_seg.npy')
+                filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
             ), segmentation)
 
             for name, i in images.items():
