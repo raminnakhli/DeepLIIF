@@ -508,22 +508,27 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
             post_images, scoring = postprocess(img, images['Seg'])
             images = {**images, **post_images}
 
-            # Save the segmentation mask
-            segmentation = np.array(images['BasicMask'])
-            np.save(os.path.join(
-                output_dir,
-                filename.replace('.' + filename.split('.')[-1], '_seg.npy')
-            ), segmentation)
-            segmentation = skimage.measure.label(segmentation[:, :, 0]) + skimage.measure.label(segmentation[:, :, 2])
+            # Load tissue mask
+            tissue_mask = np.ones_like(np.array(img))
             if mask_dir is not None:
-                mask = Image.open(os.path.join(mask_dir, filename.replace('.' + filename.split('.')[-1], '.png')))
-                mask = np.array(mask.convert('1'))
-                segmentation = segmentation * mask
-            segmentation = skimage.measure.label(segmentation)
+                tissue_mask = Image.open(os.path.join(mask_dir, filename.replace('.' + filename.split('.')[-1], '.png')))
+                tissue_mask = np.array(tissue_mask.convert('1'))
+
+            # Save the segmentation mask
+            segmentation = np.array(images['SegRefined'])
+            inst_seg = skimage.measure.label(segmentation[:, :, 0], background=0) + \
+                       skimage.measure.label(segmentation[:, :, 2], background=0)
+            inst_seg = skimage.measure.label(inst_seg, background=0) * tissue_mask
             np.save(os.path.join(
                 output_dir,
                 filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
-            ), segmentation)
+            ), inst_seg)
+
+            # Save type mask
+            np.save(os.path.join(
+                output_dir,
+                filename.replace('.' + filename.split('.')[-1], '_type_seg.npy')
+            ), np.concatenate((segmentation[:, :, 0], segmentation[:, :, 2]), axis=2))
 
             for name, i in images.items():
                 i.save(os.path.join(
