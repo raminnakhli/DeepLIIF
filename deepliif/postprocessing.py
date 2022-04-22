@@ -250,11 +250,13 @@ def create_final_segmentation_mask_with_boundaries(mask_image):
     refined_mask = mask_image.copy()
 
     edges = feature.canny(refined_mask[:, :, 0], sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[
+                  -2:]  # a more recent cv2 version has 3 returned values
     cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
 
     edges = feature.canny(refined_mask[:, :, 2], sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[
+                  -2:]  # a more recent cv2 version has 3 returned values
     cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
 
     return refined_mask
@@ -266,11 +268,13 @@ def overlay_final_segmentation_mask(img, mask_image):
     overlaid_mask = img.copy()
 
     edges = feature.canny(positive_mask, sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[
+                  -2:]  # a more recent cv2 version has 3 returned values
     cv2.drawContours(overlaid_mask, contours, -1, (255, 0, 0), 2)
 
     edges = feature.canny(negative_mask, sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[
+                  -2:]  # a more recent cv2 version has 3 returned values
     cv2.drawContours(overlaid_mask, contours, -1, (0, 0, 255), 2)
 
     return overlaid_mask
@@ -289,7 +293,8 @@ def create_final_segmentation_mask(img, seg_img, marker_image, marker_effect=0.4
 
 
 def create_basic_segmentation_mask(img, seg_img, thresh=80, noise_objects_size=20, small_object_size=50):
-    positive_mask, negative_mask = positive_negative_masks_basic(img, seg_img, thresh, noise_objects_size, small_object_size)
+    positive_mask, negative_mask = positive_negative_masks_basic(img, seg_img, thresh, noise_objects_size,
+                                                                 small_object_size)
 
     mask = np.zeros_like(img)
 
@@ -356,18 +361,16 @@ def adjust_marker(inferred_tile, orig_tile):
     inferred_tile_array = np.array(inferred_tile)
     orig_tile_array = np.array(orig_tile)
 
-    multiplier = 8 / math.log(np.max(orig_tile_array))
-
+    gamma = 8 / math.log(np.max(orig_tile_array))
     if np.mean(orig_tile_array) < 200:
-        processed_tile = imadjust(inferred_tile_array,
-                                  gamma=multiplier * math.log(np.std(inferred_tile_array)) / math.log(
-                                      np.std(orig_tile_array)),
-                                  c=5, d=255).astype(np.uint8)
+        try:
+            gamma = gamma * math.log(np.std(inferred_tile_array)) / math.log(np.std(orig_tile_array))
+        finally:
+            pass
 
-    else:
-        processed_tile = imadjust(inferred_tile_array,
-                                  gamma=multiplier,
-                                  c=5, d=255).astype(np.uint8)
+    processed_tile = imadjust(inferred_tile_array,
+                              gamma=gamma,
+                              c=5, d=255).astype(np.uint8)
     return Image.fromarray(processed_tile)
 
 
