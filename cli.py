@@ -2,6 +2,7 @@ import os
 import json
 import time
 import random
+from multiprocessing import Pool
 
 import click
 import cv2
@@ -9,6 +10,7 @@ import skimage.measure
 import torch
 import numpy as np
 from PIL import Image
+from tqdm import tqdm
 
 from deepliif.data import create_dataset, transform
 from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
@@ -490,57 +492,55 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
 
     image_files = [fn for fn in os.listdir(input_dir) if allowed_file(fn)]
 
-    with click.progressbar(
-            image_files,
-            label=f'Processing {len(image_files)} images',
-            item_show_func=lambda fn: fn
-    ) as bar:
-        for filename in bar:
-            img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
+    def single_thread_test(filename):
+        img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
 
-            images = inference(
-                img,
-                tile_size=tile_size,
-                overlap_size=compute_overlap(img.size, tile_size),
-                model_path=model_dir
-            )
+        images = inference(
+            img,
+            tile_size=tile_size,
+            overlap_size=compute_overlap(img.size, tile_size),
+            model_path=model_dir
+        )
 
-            post_images, scoring = postprocess(img, images['Seg'])
-            images = {**images, **post_images}
+        post_images, scoring = postprocess(img, images['Seg'])
+        images = {**images, **post_images}
 
-            # Load tissue mask
-            tissue_mask = np.ones_like(np.array(img))
-            if mask_dir is not None:
-                tissue_mask = Image.open(os.path.join(mask_dir, filename.replace('.' + filename.split('.')[-1], '.png')))
-                tissue_mask = np.array(tissue_mask.convert('1'))
+        # Load tissue mask
+        tissue_mask = np.ones_like(np.array(img))
+        if mask_dir is not None:
+            tissue_mask = Image.open(os.path.join(mask_dir, filename.replace('.' + filename.split('.')[-1], '.png')))
+            tissue_mask = np.array(tissue_mask.convert('1'))
 
-            # Save the segmentation mask
-            segmentation = np.array(images['SegRefined'])
-            inst_seg = skimage.measure.label(segmentation[:, :, 0], background=0) + \
-                       skimage.measure.label(segmentation[:, :, 2], background=0)
-            inst_seg = skimage.measure.label(inst_seg, background=0) * tissue_mask
-            np.save(os.path.join(
+        # Save the segmentation mask
+        segmentation = np.array(images['SegRefined'])
+        inst_seg = skimage.measure.label(segmentation[:, :, 0], background=0) + \
+                   skimage.measure.label(segmentation[:, :, 2], background=0)
+        inst_seg = skimage.measure.label(inst_seg, background=0) * tissue_mask
+        np.save(os.path.join(
+            output_dir,
+            filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
+        ), inst_seg)
+
+        # Save type mask
+        np.save(os.path.join(
+            output_dir,
+            filename.replace('.' + filename.split('.')[-1], '_type_seg.npy')
+        ), np.stack((segmentation[:, :, 0], segmentation[:, :, 2]), axis=-1))
+
+        for name, i in images.items():
+            i.save(os.path.join(
                 output_dir,
-                filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
-            ), inst_seg)
+                filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
+            ))
 
-            # Save type mask
-            np.save(os.path.join(
+        with open(os.path.join(
                 output_dir,
-                filename.replace('.' + filename.split('.')[-1], '_type_seg.npy')
-            ), np.stack((segmentation[:, :, 0], segmentation[:, :, 2]), axis=-1))
+                filename.replace('.' + filename.split('.')[-1], f'.json')
+        ), 'w') as f:
+            json.dump(scoring, f, indent=2)
 
-            for name, i in images.items():
-                i.save(os.path.join(
-                    output_dir,
-                    filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
-                ))
-
-            with open(os.path.join(
-                    output_dir,
-                    filename.replace('.' + filename.split('.')[-1], f'.json')
-            ), 'w') as f:
-                json.dump(scoring, f, indent=2)
+    with Pool() as pool:
+        tqdm(pool.imap(single_thread_test, image_files), total=len(image_files), desc="processing images")
 
 
 @cli.command()
