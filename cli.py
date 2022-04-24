@@ -539,10 +539,13 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
         ), 'w') as f:
             json.dump(scoring, f, indent=2)
 
-    pool = Pool()
-    tqdm(pool.imap(single_thread_test, image_files), total=len(image_files), desc="processing images")
-    pool.close()
-    pool.join()
+    with click.progressbar(
+            image_files,
+            label=f'Processing {len(image_files)} images',
+            item_show_func=lambda fn: fn
+    ) as bar:
+        for filename in bar:
+            single_thread_test(filename)
 
 
 @cli.command()
