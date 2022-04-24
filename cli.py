@@ -1,3 +1,4 @@
+import multiprocessing
 import os
 import json
 import time
@@ -549,7 +550,7 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
     #     for filename in bar:
     #         single_thread_test(filename)
 
-    pool = Pool()
+    pool = Pool(multiprocessing.cpu_count())
     pool.map(partial(single_thread_test, input_dir=input_dir, output_dir=output_dir,
                      mask_dir=mask_dir, tile_size=tile_size, model_dir=model_dir), image_files)
     pool.close()
