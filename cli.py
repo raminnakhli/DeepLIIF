@@ -2,6 +2,7 @@ import os
 import json
 import time
 import random
+from functools import partial
 from multiprocessing import Pool
 
 import click
@@ -478,6 +479,54 @@ def serialize(models_dir, output_dir):
             traced_net.save(f'{output_dir}/{name}.pt')
 
 
+def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, output_dir):
+    img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
+
+    images = inference(
+        img,
+        tile_size=tile_size,
+        overlap_size=compute_overlap(img.size, tile_size),
+        model_path=model_dir
+    )
+
+    post_images, scoring = postprocess(img, images['Seg'])
+    images = {**images, **post_images}
+
+    # Load tissue mask
+    tissue_mask = np.ones_like(np.array(img))
+    if mask_dir is not None:
+        tissue_mask = Image.open(os.path.join(mask_dir, filename.replace('.' + filename.split('.')[-1], '.png')))
+        tissue_mask = np.array(tissue_mask.convert('1'))
+
+    # Save the segmentation mask
+    segmentation = np.array(images['SegRefined'])
+    inst_seg = skimage.measure.label(segmentation[:, :, 0], background=0) + \
+               skimage.measure.label(segmentation[:, :, 2], background=0)
+    inst_seg = skimage.measure.label(inst_seg, background=0) * tissue_mask
+    np.save(os.path.join(
+        output_dir,
+        filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
+    ), inst_seg)
+
+    # Save type mask
+    np.save(os.path.join(
+        output_dir,
+        filename.replace('.' + filename.split('.')[-1], '_type_seg.npy')
+    ), np.stack((segmentation[:, :, 0], segmentation[:, :, 2]), axis=-1))
+
+    for name, i in images.items():
+        i.save(os.path.join(
+            output_dir,
+            filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
+        ))
+
+    with open(os.path.join(
+            output_dir,
+            filename.replace('.' + filename.split('.')[-1], f'.json')
+    ), 'w') as f:
+        json.dump(scoring, f, indent=2)
+
+
 @cli.command()
 @click.option('--input-dir', default='./Sample_Large_Tissues/', help='reads images from here')
 @click.option('--output-dir', help='saves results here.')
@@ -492,53 +541,6 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
 
     image_files = [fn for fn in os.listdir(input_dir) if allowed_file(fn)]
 
-    def single_thread_test(filename):
-        img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
-
-        images = inference(
-            img,
-            tile_size=tile_size,
-            overlap_size=compute_overlap(img.size, tile_size),
-            model_path=model_dir
-        )
-
-        post_images, scoring = postprocess(img, images['Seg'])
-        images = {**images, **post_images}
-
-        # Load tissue mask
-        tissue_mask = np.ones_like(np.array(img))
-        if mask_dir is not None:
-            tissue_mask = Image.open(os.path.join(mask_dir, filename.replace('.' + filename.split('.')[-1], '.png')))
-            tissue_mask = np.array(tissue_mask.convert('1'))
-
-        # Save the segmentation mask
-        segmentation = np.array(images['SegRefined'])
-        inst_seg = skimage.measure.label(segmentation[:, :, 0], background=0) + \
-                   skimage.measure.label(segmentation[:, :, 2], background=0)
-        inst_seg = skimage.measure.label(inst_seg, background=0) * tissue_mask
-        np.save(os.path.join(
-            output_dir,
-            filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
-        ), inst_seg)
-
-        # Save type mask
-        np.save(os.path.join(
-            output_dir,
-            filename.replace('.' + filename.split('.')[-1], '_type_seg.npy')
-        ), np.stack((segmentation[:, :, 0], segmentation[:, :, 2]), axis=-1))
-
-        for name, i in images.items():
-            i.save(os.path.join(
-                output_dir,
-                filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
-            ))
-
-        with open(os.path.join(
-                output_dir,
-                filename.replace('.' + filename.split('.')[-1], f'.json')
-        ), 'w') as f:
-            json.dump(scoring, f, indent=2)
-
     # with click.progressbar(
     #         image_files,
     #         label=f'Processing {len(image_files)} images',
@@ -548,7 +550,8 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
     #         single_thread_test(filename)
 
     pool = Pool()
-    pool.map(single_thread_test, image_files)
+    pool.map(partial(single_thread_test, input_dir=input_dir, output_dir=output_dir,
+                     mask_dir=mask_dir, tile_size=tile_size, model_dir=model_dir), image_files)
     pool.close()
     pool.join()
     print('pool is finished')
