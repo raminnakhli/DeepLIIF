@@ -365,7 +365,7 @@ def adjust_marker(inferred_tile, orig_tile):
     if np.mean(orig_tile_array) < 200:
         try:
             gamma = gamma * math.log(np.std(inferred_tile_array)) / math.log(np.std(orig_tile_array))
-        finally:
+        except:
             pass
 
     processed_tile = imadjust(inferred_tile_array,

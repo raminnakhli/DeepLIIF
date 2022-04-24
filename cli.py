@@ -539,13 +539,19 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
         ), 'w') as f:
             json.dump(scoring, f, indent=2)
 
-    with click.progressbar(
-            image_files,
-            label=f'Processing {len(image_files)} images',
-            item_show_func=lambda fn: fn
-    ) as bar:
-        for filename in bar:
-            single_thread_test(filename)
+    # with click.progressbar(
+    #         image_files,
+    #         label=f'Processing {len(image_files)} images',
+    #         item_show_func=lambda fn: fn
+    # ) as bar:
+    #     for filename in bar:
+    #         single_thread_test(filename)
+
+    pool = Pool()
+    pool.map(single_thread_test, image_files)
+    pool.close()
+    pool.join()
+    print('pool is finished')
 
 
 @cli.command()
