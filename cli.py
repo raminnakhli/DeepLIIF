@@ -539,8 +539,10 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
         ), 'w') as f:
             json.dump(scoring, f, indent=2)
 
-    with Pool() as pool:
-        tqdm(pool.imap(single_thread_test, image_files), total=len(image_files), desc="processing images")
+    pool = Pool()
+    tqdm(pool.imap(single_thread_test, image_files), total=len(image_files), desc="processing images")
+    pool.close()
+    pool.join()
 
 
 @cli.command()
