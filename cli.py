@@ -1,32 +1,29 @@
+import json
 import multiprocessing
 import os
-import json
-import time
 import random
+import subprocess
+import sys
+import time
 from functools import partial
 from multiprocessing import Pool
 
 import click
 import cv2
+import numpy as np
 import skimage.measure
 import torch
-import numpy as np
+import torch.distributed as dist
 from PIL import Image
-from tqdm import tqdm
+from packaging import version
 
 from deepliif.data import create_dataset, transform
 from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
 from deepliif.util import allowed_file, Visualizer
 from deepliif.util.util import mkdirs
 
-import torch.distributed as dist
 
-from packaging import version
-import subprocess
-import sys
-
-
-def set_seed(seed=0,rank=None):
+def set_seed(seed=0, rank=None):
     """
     seed: basic seed
     rank: rank of the current process, using which to mutate basic seed to have a unique seed per process
@@ -61,6 +58,7 @@ def ensure_exists(d):
     if not os.path.exists(d):
         os.makedirs(d)
 
+
 def print_options(opt):
     """Print and save options
 
@@ -82,8 +80,8 @@ def print_options(opt):
     with open(file_name, 'wt') as opt_file:
         opt_file.write(message)
         opt_file.write('\n')
-        
-        
+
+
 @click.group()
 def cli():
     """Commonly used DeepLIIF batch operations"""
@@ -175,14 +173,18 @@ def cli():
 @click.option('--save-epoch-freq', default=100,
               help='frequency of saving checkpoints at the end of epochs')
 @click.option('--save-by-iter', is_flag=True, help='whether saves model by iteration')
-@click.option('--remote', type=bool, default=False, help='whether isolate visdom checkpoints or not; if False, you can run a separate visdom server anywhere that consumes the checkpoints')
-@click.option('--remote-transfer-cmd', type=str, default=None, help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
+@click.option('--remote', type=bool, default=False,
+              help='whether isolate visdom checkpoints or not; if False, you can run a separate visdom server anywhere that consumes the checkpoints')
+@click.option('--remote-transfer-cmd', type=str, default=None,
+              help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
 @click.option('--dataset_mode', type=str, default='aligned',
               help='chooses how datasets are loaded. [unaligned | aligned | single | colorization]')
 @click.option('--padding', type=str, default='zero',
               help='chooses the type of padding used by resnet generator. [reflect | zero]')
-@click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
-@click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
+@click.option('--local-rank', type=int, default=None,
+              help='placeholder argument for torchrun, no need for manual setup')
+@click.option('--seed', type=int, default=None,
+              help='basic seed to be used for deterministic training, default to None (non-deterministic)')
 def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
           n_layers_d, norm, init_type, init_gain, padding_type, no_dropout, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
@@ -204,22 +206,22 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
 
     if gpu_ids and gpu_ids[0] == -1:
         gpu_ids = []
-        
-    local_rank = os.getenv('LOCAL_RANK') # DDP single node training triggered by torchrun has LOCAL_RANK
-    rank = os.getenv('RANK') # if using DDP with multiple nodes, please provide global rank in env var RANK
+
+    local_rank = os.getenv('LOCAL_RANK')  # DDP single node training triggered by torchrun has LOCAL_RANK
+    rank = os.getenv('RANK')  # if using DDP with multiple nodes, please provide global rank in env var RANK
 
     if len(gpu_ids) > 0:
         if local_rank is not None:
             local_rank = int(local_rank)
             torch.cuda.set_device(gpu_ids[local_rank])
-            gpu_ids=[gpu_ids[local_rank]]
+            gpu_ids = [gpu_ids[local_rank]]
         else:
             torch.cuda.set_device(gpu_ids[0])
 
-    if local_rank is not None: # LOCAL_RANK will be assigned a rank number if torchrun ddp is used
+    if local_rank is not None:  # LOCAL_RANK will be assigned a rank number if torchrun ddp is used
         dist.init_process_group(backend='nccl')
-        print('local rank:',local_rank)
-        flag_deterministic = set_seed(seed,local_rank)
+        print('local rank:', local_rank)
+        flag_deterministic = set_seed(seed, local_rank)
     elif rank is not None:
         flag_deterministic = set_seed(seed, rank)
     else:
@@ -227,7 +229,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
 
     if flag_deterministic:
         padding_type = 'zero'
-        print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
+        print(
+            'padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
 
     # create a dataset given dataset_mode and other options
     # dataset = AlignedDataset(opt)
@@ -266,8 +269,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
         visualizer.reset()
 
         # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
-        if local_rank is not None or os.getenv('RANK') is not None: # if DDP is used, either on one node or multi nodes
-            if not serial_batches: # if we want randome order in mini batches
+        if local_rank is not None or os.getenv('RANK') is not None:  # if DDP is used, either on one node or multi nodes
+            if not serial_batches:  # if we want randome order in mini batches
                 dataset.sampler.set_epoch(epoch)
 
         # inner loop within one epoch
@@ -403,11 +406,16 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
 @click.option('--save-epoch-freq', default=100,
               help='frequency of saving checkpoints at the end of epochs')
 @click.option('--save-by-iter', is_flag=True, help='whether saves model by iteration')
-@click.option('--remote', type=bool, default=False, help='whether isolate visdom checkpoints or not; if False, you can run a separate visdom server anywhere that consumes the checkpoints')
-@click.option('--remote-transfer-cmd', type=str, default=None, help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
-@click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
-@click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
-@click.option('--use-torchrun', type=str, default=None, help='provide torchrun options, all in one string, for example "-t3 --log_dir ~/log/ --nproc_per_node 1"; if your pytorch version is older than 1.10, torch.distributed.launch will be called instead of torchrun')
+@click.option('--remote', type=bool, default=False,
+              help='whether isolate visdom checkpoints or not; if False, you can run a separate visdom server anywhere that consumes the checkpoints')
+@click.option('--remote-transfer-cmd', type=str, default=None,
+              help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
+@click.option('--local-rank', type=int, default=None,
+              help='placeholder argument for torchrun, no need for manual setup')
+@click.option('--seed', type=int, default=None,
+              help='basic seed to be used for deterministic training, default to None (non-deterministic)')
+@click.option('--use-torchrun', type=str, default=None,
+              help='provide torchrun options, all in one string, for example "-t3 --log_dir ~/log/ --nproc_per_node 1"; if your pytorch version is older than 1.10, torch.distributed.launch will be called instead of torchrun')
 def trainlaunch(**kwargs):
     """
     A wrapper method that executes deepliif/train.py via subprocess.
@@ -417,47 +425,46 @@ def trainlaunch(**kwargs):
     * for developers, this at the moment can only be tested after building and installing deepliif
       because deepliif/train.py imports deepliif.xyz, and this reference is wrong until the deepliif package is installed
     """
-        
+
     #### process options
     args = sys.argv[2:]
-    
+
     ## args/options not needed in train,py 
     l_arg_skip = ['--use-torchrun']
-    
+
     ## exclude the options to skip, both the option name and the value if it has
     args_final = []
-    for i,arg in enumerate(args):
+    for i, arg in enumerate(args):
         if i == 0:
             if arg not in l_arg_skip:
                 args_final.append(arg)
         else:
-            if args[i-1] in l_arg_skip and arg.startswith('--'):
+            if args[i - 1] in l_arg_skip and arg.startswith('--'):
                 # if the previous element is an option name to skip AND if the current element is an option name, not a value to the previous option
                 args_final.append(arg)
-            elif args[i-1] not in l_arg_skip and arg not in l_arg_skip:
+            elif args[i - 1] not in l_arg_skip and arg not in l_arg_skip:
                 # if the previous element is not an option name to skip AND if the current element is not an option to remove
                 args_final.append(arg)
 
     ## add quotes back to the input arg that had quotes, e.g., experiment name
     args_final = [f'"{arg}"' if ' ' in arg else arg for arg in args_final]
-    
+
     ## concatenate back to a string
     options = ' '.join(args_final)
 
     #### locate train.py
     import deepliif
-    path_train_py = deepliif.__path__[0]+'/train.py'
+    path_train_py = deepliif.__path__[0] + '/train.py'
 
     #### execute train.py
     if kwargs['use_torchrun']:
         if version.parse(torch.__version__) >= version.parse('1.10.0'):
-            subprocess.run(f'torchrun {kwargs["use_torchrun"]} {path_train_py} {options}',shell=True)
+            subprocess.run(f'torchrun {kwargs["use_torchrun"]} {path_train_py} {options}', shell=True)
         else:
-            subprocess.run(f'python -m torch.distributed.launch {kwargs["use_torchrun"]} {path_train_py} {options}',shell=True)
+            subprocess.run(f'python -m torch.distributed.launch {kwargs["use_torchrun"]} {path_train_py} {options}',
+                           shell=True)
     else:
-        subprocess.run(f'python {path_train_py} {options}',shell=True)
-
-
+        subprocess.run(f'python {path_train_py} {options}', shell=True)
 
 
 @cli.command()
@@ -500,20 +507,18 @@ def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, outp
         tissue_mask = np.array(tissue_mask.convert('1'))
 
     # Save the segmentation mask
-    segmentation = np.array(images['SegRefined'])
-    inst_seg = skimage.measure.label(segmentation[:, :, 0], background=0) + \
-               skimage.measure.label(segmentation[:, :, 2], background=0)
+    segmentation = np.array(images['SegRefined']).copy()
+    segmentation = np.stack((segmentation[:, :, 0], segmentation[:, :, 2]), axis=-1)
+    segmentation[segmentation != 0, :] = 1
+
+    inst_seg = skimage.measure.label(segmentation[:, :, 0], background=0) + 2 * skimage.measure.label(
+        segmentation[:, :, 2], background=0)
     inst_seg = skimage.measure.label(inst_seg, background=0) * tissue_mask
+    inst_seg = np.stack((inst_seg[:, :, np.newaxis], segmentation), axis=-1)
     np.save(os.path.join(
         output_dir,
         filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
     ), inst_seg)
-
-    # Save type mask
-    np.save(os.path.join(
-        output_dir,
-        filename.replace('.' + filename.split('.')[-1], '_type_seg.npy')
-    ), np.stack((segmentation[:, :, 0], segmentation[:, :, 2]), axis=-1))
 
     for name, i in images.items():
         i.save(os.path.join(
@@ -631,28 +636,28 @@ def prepare_testing_data(input_dir, dataset_dir):
 def visualize(pickle_dir):
     import pickle
 
-    path_init = os.path.join(pickle_dir,'opt.pickle')
+    path_init = os.path.join(pickle_dir, 'opt.pickle')
     print(f'waiting for initialization signal from {path_init}')
     while not os.path.exists(path_init):
         time.sleep(1)
 
-    params_opt = pickle.load(open(path_init,'rb'))
+    params_opt = pickle.load(open(path_init, 'rb'))
     params_opt['remote'] = False
-    visualizer = Visualizer(**params_opt)   # create a visualizer that display/save images and plots
+    visualizer = Visualizer(**params_opt)  # create a visualizer that display/save images and plots
 
-    paths_plot = {'display_current_results':os.path.join(pickle_dir,'display_current_results.pickle'),
-                'plot_current_losses':os.path.join(pickle_dir,'plot_current_losses.pickle')}
+    paths_plot = {'display_current_results': os.path.join(pickle_dir, 'display_current_results.pickle'),
+                  'plot_current_losses': os.path.join(pickle_dir, 'plot_current_losses.pickle')}
 
-    last_modified_time = {k:0 for k in paths_plot.keys()} # initialize time
+    last_modified_time = {k: 0 for k in paths_plot.keys()}  # initialize time
 
     while True:
         for method, path_plot in paths_plot.items():
             try:
                 last_modified_time_plot = os.path.getmtime(path_plot)
                 if last_modified_time_plot > last_modified_time[method]:
-                    params_plot = pickle.load(open(path_plot,'rb'))
+                    params_plot = pickle.load(open(path_plot, 'rb'))
                     last_modified_time[method] = last_modified_time_plot
-                    getattr(visualizer,method)(**params_plot)
+                    getattr(visualizer, method)(**params_plot)
                     print(f'{method} refreshed, last modified time {time.ctime(last_modified_time[method])}')
                 else:
                     print(f'{method} not refreshed')
@@ -665,7 +670,8 @@ class Options:
     def __init__(self, dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d,
                  net_g, n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
                  batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch,
-                 load_iter, verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
+                 load_iter, verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server,
+                 display_env,
                  display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
                  continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
                  remote, remote_transfer_cmd, dataset_mode, padding):
