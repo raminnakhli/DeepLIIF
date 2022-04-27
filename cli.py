@@ -509,7 +509,7 @@ def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, outp
     # Save the segmentation mask
     segmentation = np.array(images['SegRefined']).copy()
     segmentation = np.stack((segmentation[:, :, 0], segmentation[:, :, 2]), axis=-1)
-    segmentation[segmentation != 0, :] = 1
+    segmentation[segmentation != 0] = 1
     segmentation = segmentation[:, :, 0] + 2 * segmentation[:, :, 1]
     segmentation = segmentation * tissue_mask
 
