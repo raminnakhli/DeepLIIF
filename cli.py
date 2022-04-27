@@ -510,11 +510,11 @@ def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, outp
     segmentation = np.array(images['SegRefined']).copy()
     segmentation = np.stack((segmentation[:, :, 0], segmentation[:, :, 2]), axis=-1)
     segmentation[segmentation != 0, :] = 1
+    segmentation = segmentation[:, :, 0] + 2 * segmentation[:, :, 1]
+    segmentation = segmentation * tissue_mask
 
-    inst_seg = skimage.measure.label(segmentation[:, :, 0], background=0) + 2 * skimage.measure.label(
-        segmentation[:, :, 2], background=0)
-    inst_seg = skimage.measure.label(inst_seg, background=0) * tissue_mask
-    inst_seg = np.stack((inst_seg[:, :, np.newaxis], segmentation), axis=-1)
+    inst_seg = skimage.measure.label(segmentation, background=0)
+    inst_seg = np.stack((inst_seg[:, :, np.newaxis], segmentation[:, :, np.newaxis]), axis=-1)
     np.save(os.path.join(
         output_dir,
         filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
