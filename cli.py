@@ -514,7 +514,7 @@ def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, outp
     segmentation = segmentation * tissue_mask
 
     inst_seg = skimage.measure.label(segmentation, background=0)
-    inst_seg = np.stack((inst_seg[:, :, np.newaxis], segmentation[:, :, np.newaxis]), axis=-1)
+    inst_seg = np.stack((inst_seg, segmentation), axis=-1)
     np.save(os.path.join(
         output_dir,
         filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
