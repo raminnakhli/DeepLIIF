@@ -518,7 +518,7 @@ def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, outp
     np.save(os.path.join(
         output_dir,
         filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
-    ), inst_seg)
+    ), inst_seg.astype(int))
 
     for name, i in images.items():
         i.save(os.path.join(
