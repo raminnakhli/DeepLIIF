@@ -490,6 +490,7 @@ def serialize(models_dir, output_dir):
 def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, output_dir):
     img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
 
+    print('test1', flush=True)
     images = inference(
         img,
         tile_size=tile_size,
@@ -497,15 +498,18 @@ def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, outp
         model_path=model_dir
     )
 
+    print('test2', flush=True)
     post_images, scoring = postprocess(img, images['Seg'])
     images = {**images, **post_images}
 
+    print('test3', flush=True)
     # Load tissue mask
     tissue_mask = np.ones_like(np.array(img))
     if mask_dir is not None:
         tissue_mask = Image.open(os.path.join(mask_dir, filename.replace('.' + filename.split('.')[-1], '.png')))
         tissue_mask = np.array(tissue_mask.convert('1'))
 
+    print('test4', flush=True)
     # Save the segmentation mask
     segmentation = np.array(images['BasicMask']).copy()
     segmentation = np.stack((segmentation[:, :, 0], segmentation[:, :, 2]), axis=-1)
@@ -513,6 +517,7 @@ def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, outp
     segmentation = segmentation[:, :, 0] + 2 * segmentation[:, :, 1]
     segmentation = segmentation * tissue_mask
 
+    print('test4', flush=True)
     inst_seg = skimage.measure.label(segmentation, background=0)
     inst_seg = np.stack((inst_seg, segmentation), axis=-1)
     print('=========================1', type(inst_seg), flush=True)
