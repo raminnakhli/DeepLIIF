@@ -549,6 +549,7 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
 
     image_files = [fn for fn in os.listdir(input_dir) if allowed_file(fn)]
 
+    print('file names: ', flush=True)
     # with click.progressbar(
     #         image_files,
     #         label=f'Processing {len(image_files)} images',
