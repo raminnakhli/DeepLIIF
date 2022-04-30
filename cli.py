@@ -546,7 +546,8 @@ def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, outp
 @click.option('--tile-size', default=512, help='tile size')
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
 @click.option('--mask-dir', default=None, help='path to the masks')
-def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
+@click.option('--workers', default=1, help='worker count')
+def test(input_dir, output_dir, tile_size, model_dir, workers, mask_dir=None):
     """Test trained models
     """
     output_dir = output_dir or input_dir
@@ -563,7 +564,7 @@ def test(input_dir, output_dir, tile_size, model_dir, mask_dir=None):
     #     for filename in bar:
     #         single_thread_test(filename)
 
-    pool = Pool(multiprocessing.cpu_count())
+    pool = Pool(workers)
     pool.map(partial(single_thread_test, input_dir=input_dir, output_dir=output_dir,
                      mask_dir=mask_dir, tile_size=tile_size, model_dir=model_dir), image_files)
     pool.close()
