@@ -515,11 +515,12 @@ def single_thread_test(filename, input_dir, tile_size, model_dir, mask_dir, outp
 
     inst_seg = skimage.measure.label(segmentation, background=0)
     inst_seg = np.stack((inst_seg, segmentation), axis=-1)
+    print('=========================1', type(inst_seg))
     np.save(os.path.join(
         output_dir,
         filename.replace('.' + filename.split('.')[-1], '_inst_seg.npy')
     ), inst_seg)
-    print('=========================', type(inst_seg))
+    print('=========================2', type(inst_seg))
 
     for name, i in images.items():
         i.save(os.path.join(
